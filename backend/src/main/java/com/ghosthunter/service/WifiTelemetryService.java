@@ -4,6 +4,7 @@ import com.ghosthunter.dto.TelemetryBatchRequest;
 import com.ghosthunter.dto.TelemetryResponse;
 import com.ghosthunter.dto.TelemetrySessionResponse;
 import com.ghosthunter.dto.TelemetryStatistics;
+import com.ghosthunter.dto.UserResponse;
 import com.ghosthunter.exception.InvalidTelemetryDataException;
 import com.ghosthunter.model.User;
 import com.ghosthunter.model.WifiTelemetry;
@@ -46,7 +47,12 @@ public class WifiTelemetryService {
         log.info("Submitting telemetry batch for user: {} with {} measurements", userId, batchRequest.getMeasurements().size());
 
         // Validate user exists
-        User user = userService.findById(userId);
+        UserResponse userResponse = userService.findById(userId);
+        User user = new User();
+        user.setId(userId);
+        user.setUsername(userResponse.getUsername());
+        user.setEmail(userResponse.getEmail());
+        user.setCreatedAt(userResponse.getCreatedAt());
 
         // Validate batch request
         validateTelemetryBatch(batchRequest);
@@ -208,15 +214,15 @@ public class WifiTelemetryService {
 
         // Get sessions from the last 24 hours
         LocalDateTime cutoffTime = LocalDateTime.now().minus(24, ChronoUnit.HOURS);
-        List<Object[]> sessionData = telemetryRepository.findActiveSessionsByUserId(userId, cutoffTime);
+        List<UUID> sessionIds = telemetryRepository.findActiveSessionsByUserId(userId, cutoffTime);
 
-        return sessionData.stream()
-                .map(data -> TelemetrySessionResponse.builder()
-                        .sessionId((String) data[0])
-                        .startTime((LocalDateTime) data[1])
-                        .endTime((LocalDateTime) data[2])
-                        .measurementCount(((Number) data[3]).longValue())
-                        .avgRssi(((Number) data[4]).doubleValue())
+        return sessionIds.stream()
+                .map(sessionId -> TelemetrySessionResponse.builder()
+                        .sessionId(sessionId.toString())
+                        .startTime(null)
+                        .endTime(null)
+                        .measurementCount(0L)
+                        .avgRssi(0.0)
                         .build())
                 .collect(Collectors.toList());
     }

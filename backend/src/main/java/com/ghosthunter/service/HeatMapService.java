@@ -3,10 +3,13 @@ package com.ghosthunter.service;
 import com.ghosthunter.dto.HeatMapRequest;
 import com.ghosthunter.dto.HeatMapResponse;
 import com.ghosthunter.dto.HeatMapStatistics;
+import com.ghosthunter.dto.UserResponse;
 import com.ghosthunter.exception.InvalidHeatMapDataException;
+import com.ghosthunter.exception.UserNotFoundException;
 import com.ghosthunter.model.User;
 import com.ghosthunter.model.WifiTelemetry;
 import com.ghosthunter.repository.WifiTelemetryRepository;
+import com.ghosthunter.service.UserService.UserStatistics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,7 +45,7 @@ public class HeatMapService {
         log.info("Generating heat map for user: {} with request: {}", userId, request);
 
         // Validate user exists
-        User user = userService.findById(userId);
+        UserResponse userResponse = userService.findById(userId);
 
         // Validate request parameters
         validateHeatMapRequest(request);
@@ -63,6 +66,25 @@ public class HeatMapService {
 
         log.info("Successfully generated heat map for user: {} with {} grid cells", userId, grid.getCells().size());
 
+        // Convert internal HeatMapGrid to DTO HeatMapGrid
+        List<HeatMapResponse.HeatMapCell> dtoCells = grid.getCells().stream()
+                .map(cell -> HeatMapResponse.HeatMapCell.builder()
+                        .latitude(cell.getLatitude())
+                        .longitude(cell.getLongitude())
+                        .measurementCount(cell.getMeasurementCount())
+                        .averageRssi(cell.getAverageRssi())
+                        .signalStrengthCategory(cell.getSignalStrengthCategory())
+                        .build())
+                .collect(Collectors.toList());
+
+        HeatMapResponse.HeatMapGrid dtoGrid = HeatMapResponse.HeatMapGrid.builder()
+                .centerLatitude(grid.getCenterLatitude())
+                .centerLongitude(grid.getCenterLongitude())
+                .gridSizeMeters(grid.getGridSizeMeters())
+                .radiusMeters(grid.getRadiusMeters())
+                .cells(dtoCells)
+                .build();
+
         return HeatMapResponse.builder()
                 .userId(userId.toString())
                 .centerLatitude(request.getCenterLatitude())
@@ -71,40 +93,24 @@ public class HeatMapService {
                 .gridSizeMeters(request.getGridSizeMeters())
                 .timeRangeStart(request.getTimeRangeStart())
                 .timeRangeEnd(request.getTimeRangeEnd())
-                .grid(grid)
+                .grid(dtoGrid)
                 .statistics(statistics)
                 .generatedAt(LocalDateTime.now())
                 .build();
     }
 
     /**
-     * Get heat map statistics for a user.
+     * Get user statistics for dashboard.
      *
      * @param userId User ID
-     * @param request Heat map request
-     * @return Heat map statistics
+     * @return User statistics
+     * @throws UserNotFoundException if user not found
      */
-    @Transactional(readOnly = true)
-    public HeatMapStatistics getHeatMapStatistics(UUID userId, HeatMapRequest request) {
-        log.info("Getting heat map statistics for user: {}", userId);
-
-        // Validate user exists
-        userService.findById(userId);
-
-        // Validate request parameters
-        validateHeatMapRequest(request);
-
-        // Get telemetry data
-        List<WifiTelemetry> telemetryData = getTelemetryData(userId, request);
-
-        if (telemetryData.isEmpty()) {
-            return HeatMapStatistics.empty();
-        }
-
-        // Generate heat map grid
-        HeatMapGrid grid = generateHeatMapGrid(telemetryData, request);
-
-        return calculateHeatMapStatistics(grid);
+    public UserStatistics getUserStatistics(UUID userId) {
+        log.debug("Getting statistics for user: {}", userId);
+        
+        // Use the UserService to get user statistics
+        return userService.getUserStatistics(userId);
     }
 
     /**
@@ -201,7 +207,8 @@ public class HeatMapService {
                     
                     double distance = calculateDistance(
                             request.getCenterLatitude(), request.getCenterLongitude(),
-                            telemetry.getLatitude(), telemetry.getLongitude()
+                            telemetry.getLatitude() != null ? telemetry.getLatitude().doubleValue() : 0.0,
+                            telemetry.getLongitude() != null ? telemetry.getLongitude().doubleValue() : 0.0
                     );
                     
                     return distance <= request.getRadiusMeters();
@@ -258,8 +265,8 @@ public class HeatMapService {
         
         List<WifiTelemetry> cellData = telemetryData.stream()
                 .filter(t -> t.getLatitude() != null && t.getLongitude() != null)
-                .filter(t -> Math.abs(t.getLatitude() - latitude) <= gridSizeHalf / 111000.0)
-                .filter(t -> Math.abs(t.getLongitude() - longitude) <= gridSizeHalf / (111000.0 * Math.cos(Math.toRadians(latitude))))
+                .filter(t -> Math.abs(t.getLatitude().doubleValue() - latitude) <= gridSizeHalf / 111000.0)
+                .filter(t -> Math.abs(t.getLongitude().doubleValue() - longitude) <= gridSizeHalf / (111000.0 * Math.cos(Math.toRadians(latitude))))
                 .collect(Collectors.toList());
 
         if (cellData.isEmpty()) {
@@ -379,12 +386,12 @@ public class HeatMapService {
             
             if (groupData.size() > 0) {
                 double avgLat = groupData.stream()
-                        .mapToDouble(t -> t.getLatitude() != null ? t.getLatitude() : 0.0)
+                        .mapToDouble(t -> t.getLatitude() != null ? t.getLatitude().doubleValue() : 0.0)
                         .average()
                         .orElse(0.0);
                 
                 double avgLon = groupData.stream()
-                        .mapToDouble(t -> t.getLongitude() != null ? t.getLongitude() : 0.0)
+                        .mapToDouble(t -> t.getLongitude() != null ? t.getLongitude().doubleValue() : 0.0)
                         .average()
                         .orElse(0.0);
                 
@@ -476,6 +483,7 @@ public class HeatMapService {
     /**
      * Heat map grid data class.
      */
+    @lombok.Builder
     public static class HeatMapGrid {
         private double centerLatitude;
         private double centerLongitude;
@@ -503,6 +511,7 @@ public class HeatMapService {
     /**
      * Heat map cell data class.
      */
+    @lombok.Builder
     public static class HeatMapCell {
         private double latitude;
         private double longitude;
@@ -530,6 +539,7 @@ public class HeatMapService {
     /**
      * Position recommendation data class.
      */
+    @lombok.Builder
     public static class PositionRecommendation {
         private String signalCategory;
         private double latitude;
@@ -557,17 +567,18 @@ public class HeatMapService {
     /**
      * Positioning recommendations data class.
      */
+    @lombok.Builder
     public static class PositioningRecommendations {
         private Map<String, PositionRecommendation> recommendations;
         private PositionRecommendation bestPosition;
         private List<String> improvementSuggestions;
 
         public static PositioningRecommendations empty() {
-            PositioningRecommendations recs = new PositioningRecommendations();
-            recs.recommendations = new HashMap<>();
-            recs.bestPosition = null;
-            recs.improvementSuggestions = new ArrayList<>();
-            return recs;
+            return PositioningRecommendations.builder()
+                    .recommendations(new HashMap<>())
+                    .bestPosition(null)
+                    .improvementSuggestions(new ArrayList<>())
+                    .build();
         }
 
         // Getters and setters

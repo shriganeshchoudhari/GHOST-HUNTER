@@ -69,11 +69,11 @@ public class HeatMapController {
 
         try {
             UUID userId = UUID.fromString(principal.getName());
-            HeatMapStatistics statistics = heatMapService.getHeatMapStatistics(userId, request);
+            HeatMapResponse heatMap = heatMapService.generateHeatMap(userId, request);
 
             log.info("Retrieved heat map statistics for user: {}", principal.getName());
             
-            return ResponseEntity.ok(statistics);
+            return ResponseEntity.ok(heatMap.getStatistics());
         } catch (Exception e) {
             log.error("Error getting heat map statistics for user: {}", principal.getName(), e);
             return ResponseEntity.badRequest().build();

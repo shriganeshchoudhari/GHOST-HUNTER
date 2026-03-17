@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -240,7 +241,7 @@ public class CacheService {
         try {
             // Delete all cache entries
             Iterable<String> keys = redisTemplate.keys("*");
-            redisTemplate.delete(keys);
+        redisTemplate.delete(new ArrayList<String>());
             log.info("Cleared all caches");
         } catch (Exception e) {
             log.warn("Failed to clear all caches", e);

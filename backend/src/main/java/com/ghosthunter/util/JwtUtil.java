@@ -31,7 +31,7 @@ public class JwtUtil {
     @Value("${app.jwt.refresh-expiration}")
     private long jwtRefreshExpiration;
 
-    private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    private final javax.crypto.SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
     /**
      * Generate access token for user.
@@ -84,10 +84,10 @@ public class JwtUtil {
      */
     public boolean validateAccessToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(key)
+            Jwts.parser()
+                    .verifyWith(key)
                     .build()
-                    .parseClaimsJws(token);
+                    .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
             return false;
@@ -102,11 +102,11 @@ public class JwtUtil {
      */
     public boolean validateRefreshToken(String token) {
         try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(key)
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
 
             String tokenType = claims.get("type", String.class);
             return "refresh".equals(tokenType);
@@ -122,11 +122,11 @@ public class JwtUtil {
      * @return User ID as string
      */
     public String getUserIdFromAccessToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
         return claims.get("userId", String.class);
     }
@@ -138,11 +138,11 @@ public class JwtUtil {
      * @return User ID as string
      */
     public String getUserIdFromRefreshToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
         return claims.get("userId", String.class);
     }
@@ -154,11 +154,11 @@ public class JwtUtil {
      * @return User email
      */
     public String getEmailFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
         return claims.getSubject();
     }
@@ -170,11 +170,11 @@ public class JwtUtil {
      * @return Subscription tier
      */
     public String getSubscriptionTierFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
         return claims.get("subscriptionTier", String.class);
     }
