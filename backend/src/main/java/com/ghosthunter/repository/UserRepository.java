@@ -55,4 +55,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.subscriptionTier = :tier AND u.deletedAt IS NULL")
     long countActiveUsersByTier(@Param("tier") User.SubscriptionTier subscriptionTier);
+
+    @Query(value = "SELECT u.* FROM users u JOIN wifi_telemetry wt ON u.id = wt.user_id GROUP BY u.id ORDER BY COUNT(wt.id) DESC LIMIT :limit", nativeQuery = true)
+    java.util.List<User> findTopUsersByScore(@Param("limit") int limit);
 }

@@ -13,7 +13,36 @@ CREATE TABLE wifi_telemetry (
     device_id VARCHAR(255),
     session_id UUID,
     timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    wifi_ssid VARCHAR(255),
+    wifi_bssid VARCHAR(17),
+    wifi_frequency INTEGER,
+    wifi_channel INTEGER,
+    wifi_bandwidth INTEGER,
+    wifi_link_speed INTEGER,
+    wifi_rssi INTEGER,
+    wifi_security VARCHAR(50),
+    device_model VARCHAR(100),
+    device_manufacturer VARCHAR(100),
+    device_os VARCHAR(50),
+    device_os_version VARCHAR(50),
+    app_version VARCHAR(20),
+    signal_quality VARCHAR(50),
+    connection_status VARCHAR(50),
+    network_type VARCHAR(50),
+    optimal_positioning VARCHAR(100),
+    measurement_type VARCHAR(50),
+    measurement_mode VARCHAR(50),
+    measurement_accuracy VARCHAR(50),
+    measurement_confidence VARCHAR(50),
+    measurement_environment VARCHAR(100),
+    measurement_purpose VARCHAR(100),
+    measurement_tags JSONB,
+    measurement_metadata JSONB,
+    latitude DECIMAL(10,8),
+    longitude DECIMAL(11,8),
+    altitude DECIMAL(10,2),
+    accuracy DECIMAL(10,2)
 );
 
 -- Create indexes
@@ -32,66 +61,10 @@ END;
 $$ language 'plpgsql';
 
 -- Create trigger to automatically update created_at
-CREATE TRIGGER update_wifi_telemetry_created_at 
-    BEFORE INSERT ON wifi_telemetry 
-    FOR EACH ROW 
+CREATE TRIGGER update_wifi_telemetry_created_at
+    BEFORE INSERT ON wifi_telemetry
+    FOR EACH ROW
     EXECUTE FUNCTION update_created_at_column();
 
 -- Add constraint for RSSI range validation
 ALTER TABLE wifi_telemetry ADD CONSTRAINT valid_rssi CHECK (rssi >= -100 AND rssi <= 0);
-
--- Create view for active sessions
-CREATE OR REPLACE VIEW active_telemetry_sessions AS
-SELECT 
-    session_id,
-    MIN(timestamp) as start_time,
-    MAX(timestamp) as end_time,
-    COUNT(*) as measurement_count,
-    AVG(rssi) as avg_rssi
-FROM wifi_telemetry 
-WHERE session_id IS NOT NULL 
-    AND timestamp >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
-GROUP BY session_id
-HAVING COUNT(*) > 0;
-
--- Create function to find active sessions by user
-CREATE OR REPLACE FUNCTION find_active_sessions_by_user(p_user_id UUID, p_cutoff_time TIMESTAMP)
-RETURNS TABLE (
-    session_id VARCHAR,
-    start_time TIMESTAMP,
-    end_time TIMESTAMP,
-    measurement_count BIGINT,
-    avg_rssi DOUBLE PRECISION
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        s.session_id::VARCHAR,
-        s.start_time,
-        s.end_time,
-        s.measurement_count,
-        s.avg_rssi
-    FROM active_telemetry_sessions s
-    JOIN wifi_telemetry t ON s.session_id = t.session_id
-    WHERE t.user_id = p_user_id
-        AND s.start_time >= p_cutoff_time
-    GROUP BY s.session_id, s.start_time, s.end_time, s.measurement_count, s.avg_rssi
-    ORDER BY s.start_time DESC;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create function to delete old telemetry data
-CREATE OR REPLACE FUNCTION delete_old_telemetry_data(p_user_id UUID, p_cutoff_time TIMESTAMP)
-RETURNS BIGINT AS $$
-DECLARE
-    deleted_count BIGINT;
-BEGIN
-    DELETE FROM wifi_telemetry 
-    WHERE user_id = p_user_id 
-        AND timestamp < p_cutoff_time;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql;

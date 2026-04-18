@@ -260,16 +260,35 @@ public class HeatMapService {
     /**
      * Create a heat map cell.
      */
+    /**
+     * Create a heat map cell using IDW interpolation.
+     */
     private HeatMapCell createHeatMapCell(List<WifiTelemetry> telemetryData, double latitude, double longitude, double gridSize) {
-        double gridSizeHalf = gridSize / 2.0;
-        
-        List<WifiTelemetry> cellData = telemetryData.stream()
-                .filter(t -> t.getLatitude() != null && t.getLongitude() != null)
-                .filter(t -> Math.abs(t.getLatitude().doubleValue() - latitude) <= gridSizeHalf / 111000.0)
-                .filter(t -> Math.abs(t.getLongitude().doubleValue() - longitude) <= gridSizeHalf / (111000.0 * Math.cos(Math.toRadians(latitude))))
-                .collect(Collectors.toList());
+        double p = 2.0;
+        double totalWeight = 0.0;
+        double weightedSum = 0.0;
+        long count = 0;
 
-        if (cellData.isEmpty()) {
+        for (WifiTelemetry t : telemetryData) {
+            if (t.getLatitude() == null || t.getLongitude() == null) continue;
+            double dist = calculateDistance(latitude, longitude, t.getLatitude().doubleValue(), t.getLongitude().doubleValue());
+            if (dist < 0.1) {
+                return HeatMapCell.builder()
+                        .latitude(latitude)
+                        .longitude(longitude)
+                        .measurementCount(1)
+                        .averageRssi((double) t.getRssi())
+                        .signalStrengthCategory(calculateSignalCategory((double) t.getRssi()))
+                        .build();
+            }
+            if (dist <= 50.0) {
+                double weight = 1.0 / Math.pow(dist, p);
+                weightedSum += weight * t.getRssi();
+                totalWeight += weight;
+                count++;
+            }
+        }
+        if (count == 0) {
             return HeatMapCell.builder()
                     .latitude(latitude)
                     .longitude(longitude)
@@ -278,20 +297,13 @@ public class HeatMapService {
                     .signalStrengthCategory("NO_DATA")
                     .build();
         }
-
-        double avgRssi = cellData.stream()
-                .mapToInt(WifiTelemetry::getRssi)
-                .average()
-                .orElse(0.0);
-
-        String signalCategory = calculateSignalCategory(avgRssi);
-
+        double interpolatedRssi = weightedSum / totalWeight;
         return HeatMapCell.builder()
                 .latitude(latitude)
                 .longitude(longitude)
-                .measurementCount(cellData.size())
-                .averageRssi(avgRssi)
-                .signalStrengthCategory(signalCategory)
+                .measurementCount(count)
+                .averageRssi(interpolatedRssi)
+                .signalStrengthCategory(calculateSignalCategory(interpolatedRssi))
                 .build();
     }
 

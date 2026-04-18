@@ -20,11 +20,15 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
     @Lazy
     private final UserService userService;
     private final JwtAuthenticationFilter jwtAuthFilter;
+
+    public SecurityConfig(@Lazy UserService userService, JwtAuthenticationFilter jwtAuthFilter) {
+        this.userService = userService;
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
     /**
      * Configure security filter chain.
      */
@@ -34,8 +38,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/api/v1/auth/**",
-                    "/api/v1/actuator/**",
+                    "/auth/**",
+                    "/actuator/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/swagger-ui.html"

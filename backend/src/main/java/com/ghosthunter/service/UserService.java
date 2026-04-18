@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +24,17 @@ import java.util.UUID;
  * Service for user management operations including registration, authentication, and profile management.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class UserService implements org.springframework.security.core.userdetails.UserDetailsService {
 
     private final UserRepository userRepository;
+    @Lazy
     private final PasswordEncoder passwordEncoder;
+
+    public UserService(UserRepository userRepository, @Lazy PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     /**
      * Register a new user account.
@@ -283,8 +289,20 @@ public class UserService implements org.springframework.security.core.userdetail
      * @return User statistics
      * @throws UserNotFoundException if user not found
      */
+    public java.util.List<UserResponse> getLeaderboard(int limit) {
+        return userRepository.findTopUsersByScore(limit).stream()
+                .map(UserResponse::fromUser)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     public UserStatistics getUserStatistics(UUID userId) {
-        log.debug("Getting statistics for user: {}", userId);
+
+    /**
+     * Get top users for leaderboard.
+     *
+     * @param limit Number of users to return
+     * @return List of user responses
+     */
         
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> {

@@ -1,8 +1,10 @@
 spring:
   application:
     name: ghost-hunter-backend
+
   main:
     allow-circular-references: true
+
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -18,6 +20,7 @@ spring:
         order_updates: true
     show-sql: false
     open-in-view: false
+
   datasource:
     url: jdbc:postgresql://localhost:5432/ghost_hunter
     username: postgres
@@ -28,26 +31,32 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-  redis:
-    host: localhost
-    port: 6379
-    password: 
-    timeout: 2000ms
-    jedis:
-      pool:
-        max-active: 20
-        max-idle: 10
-        min-idle: 5
+
+  # ✅ FIXED: spring.redis → spring.data.redis + jedis → lettuce
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8080
           jwk-set-uri: http://localhost:8080/.well-known/jwks.json
+
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -55,8 +64,9 @@ spring:
       indent-output: false
     deserialization:
       fail-on-unknown-properties: false
+
 server:
-  port: 8080
+  port: 8081
   servlet:
     context-path: /api/v1
   compression:
@@ -65,14 +75,15 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+
 logging:
   level:
     root: INFO
     com.ghosthunter: DEBUG
     org.springframework.web: INFO
     org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    "[org.hibernate.SQL]": DEBUG
+    "[org.hibernate.type.descriptor.sql.BasicBinder]": TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -80,6 +91,8 @@ logging:
     name: logs/ghost-hunter.log
     max-size: 10MB
     max-history: 30
+
+# ⚠️ works only if actuator dependency is present
 management:
   endpoints:
     web:
@@ -92,26 +105,32 @@ management:
     export:
       prometheus:
         enabled: true
+
 app:
   jwt:
-    secret: your-secret-key-change-in-production
+    secret: ${JWT_SECRET:your-secret-key-change-in-production}
     expiration: 3600000
     refresh-expiration: 2592000000
+
   cors:
     allowed-origins: http://localhost:3000,http://localhost:19006
     allowed-methods: GET,POST,PUT,DELETE,OPTIONS
     allowed-headers: "*"
     allow-credentials: true
     max-age: 3600
+
   api:
     base-url: http://localhost:8080/api/v1
     rate-limit:
       enabled: true
       requests-per-minute: 60
+
   file-upload:
     max-size: 10485760
     allowed-types: image/jpeg,image/png,image/gif,video/mp4
     storage-path: /tmp/ghost-hunter
+
+# ⚠️ works only if flyway dependency is present
 flyway:
   enabled: true
   locations: classpath:db/migration

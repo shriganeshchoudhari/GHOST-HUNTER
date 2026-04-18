@@ -1,6 +1,7 @@
 package com.ghosthunter.config;
 
 import com.ghosthunter.service.UserService;
+import org.springframework.context.annotation.Lazy;
 import com.ghosthunter.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,11 +22,16 @@ import java.io.IOException;
  * JWT authentication filter for processing JWT tokens in requests.
  */
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    @Lazy
     private final UserService userService;
+
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, @Lazy UserService userService) {
+        this.jwtUtil = jwtUtil;
+        this.userService = userService;
+    }
 
     /**
      * Filter requests to authenticate JWT tokens.
