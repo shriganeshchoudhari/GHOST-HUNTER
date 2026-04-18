@@ -83,4 +83,51 @@ public interface WifiTelemetryRepository extends JpaRepository<WifiTelemetry, UU
         @Param("startTime") LocalDateTime startTime,
         @Param("endTime") LocalDateTime endTime
     );
+
+    /**
+     * Find telemetry data for heat map generation within a time range.
+     * 
+     * @param userId the user ID
+     * @param startTime the start time
+     * @param endTime the end time
+     * @param pageable pagination information
+     * @return page of telemetry measurements
+     */
+    @Query("SELECT wt FROM WifiTelemetry wt WHERE wt.user.id = :userId " +
+           "AND wt.timestamp BETWEEN :startTime AND :endTime " +
+           "ORDER BY wt.timestamp DESC")
+    Page<WifiTelemetry> findByUserIdAndTimestampBetweenOrderByTimestampDesc(
+        @Param("userId") UUID userId,
+        @Param("startTime") LocalDateTime startTime,
+        @Param("endTime") LocalDateTime endTime,
+        Pageable pageable
+    );
+
+    /**
+     * Find active sessions for a user (sessions within the last hour).
+     * 
+     * @param userId the user ID
+     * @param cutoffTime the cutoff time (1 hour ago)
+     * @return list of active session IDs
+     */
+    @Query("SELECT DISTINCT wt.sessionId FROM WifiTelemetry wt WHERE wt.user.id = :userId " +
+           "AND wt.timestamp > :cutoffTime")
+    List<UUID> findActiveSessionsByUserId(
+        @Param("userId") UUID userId,
+        @Param("cutoffTime") LocalDateTime cutoffTime
+    );
+
+    /**
+     * Delete old telemetry data for a user.
+     * 
+     * @param userId the user ID
+     * @param cutoffTime the cutoff time
+     * @return number of deleted records
+     */
+    @Query("DELETE FROM WifiTelemetry wt WHERE wt.user.id = :userId " +
+           "AND wt.timestamp < :cutoffTime")
+    long deleteByUserIdAndTimestampBefore(
+        @Param("userId") UUID userId,
+        @Param("cutoffTime") LocalDateTime cutoffTime
+    );
 }
